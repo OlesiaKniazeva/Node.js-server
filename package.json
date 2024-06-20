@@ -1,0 +1,13 @@
+{
+  "name": "server",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "solution.js",
+  "scripts": {
+    "start": "node solution.js",
+    "watch": "nodemon --watch solution.js"
+  },
+  "dependencies": {
+    "debug": "^4.3.5"
+  }
+}
