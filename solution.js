@@ -38,13 +38,7 @@ function requestHandler(req, res) {
   const parsedURL = url.parse(req.url, true);
   const pathname = parsedURL.pathname;
 
-  if (method === "get" && pathname === "/test") {
-    const response = movies;
-
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(response));
-    return;
-  } else if (method === "get" && pathname === "/ping") {
+  if (method === "get" && pathname === "/ping") {
     processPingResponse(res);
   } else if (method === "post" && pathname === "/echo") {
     processEchoResponse(req, res);
@@ -180,12 +174,9 @@ function loadBackupFile(backupFilePath) {
       try {
         const lines = buffer.trim().split("\n");
 
-        // let amount = 0;
         for (const line of lines) {
           const movie = JSON.parse(line);
           movies.push(movie);
-          // amount += 1;
-          // console.log(amount);
           saveImage(movie.id, movie.img);
         }
         resolve();
