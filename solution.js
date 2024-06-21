@@ -1,6 +1,6 @@
-import { createReadStream } from "node:fs";
 import { createServer } from "node:http";
-import fs from "node:fs";
+import {createWriteStream, createReadStream, existsSync, mkdirSync } from "node:fs";
+import fs from "node:fs/promises";
 import { StringDecoder } from "node:string_decoder";
 import url from "node:url";
 import path from "node:path";
@@ -12,8 +12,8 @@ const IMAGE_FOLDER = "./images/";
 const movies = [];
 
 try {
-  if (!fs.existsSync(IMAGE_FOLDER)) {
-    fs.mkdirSync(IMAGE_FOLDER);
+  if (!existsSync(IMAGE_FOLDER)) {
+    mkdirSync(IMAGE_FOLDER);
   }
 } catch (err) {
   console.error(err);
@@ -45,7 +45,7 @@ function requestHandler(req, res) {
   } else if (method === "get" && pathname.startsWith("/api/v1/movie/")) {
     const movieId = pathname.split("/").pop();
 
-    if (!isNumber(movieId) || pathname !== "api/v1/movie/" + movieId) {
+    if (!isNumber(movieId) || pathname !== "/api/v1/movie/" + movieId) {
       respondNotFound(res);
     } else {
       processMovieQuery(res, movieId);
@@ -68,22 +68,30 @@ function requestHandler(req, res) {
   }
 }
 
-function processImageRequest(res, imageName) {
+async function processImageRequest(res, imageName) {
   const imagePath = path.join(IMAGE_FOLDER, imageName);
-  if (fs.existsSync(imagePath)) {
-    res.writeHead(200, { "Content-Type": "image/jpeg" });
-    createReadStream(imagePath).pipe(res);
-  } else {
+  try {
+    const stats = await fs.stat(imagePath); 
+    if (stats.isFile()) {
+      res.writeHead(200, { "Content-Type": "image/jpeg" });
+      createReadStream(imagePath).pipe(res);
+    } else {
+      respondNotFound(res);
+    }
+  } catch (err) {
+    console.error("Error reading image:", err);
     respondNotFound(res);
   }
 }
 
 function processSearchQuery(res, title, page) {
   const resultsPerPage = 10;
+  const startIndex = (page - 1) * resultsPerPage;
+  const endIndex = startIndex + resultsPerPage;
 
   const searchResults = movies
     .filter((movie) => movie.title.toLowerCase().includes(title))
-    .slice((page - 1) * resultsPerPage, page * resultsPerPage)
+    .slice(startIndex, endIndex)
     .map((movie) => ({
       id: movie.id,
       title: movie.title,
@@ -154,39 +162,49 @@ function processEchoResponse(req, res) {
   });
 }
 
-function saveImage(movieId, imageString) {
+async function saveImage(movieId, imageString) {
   const imagePath = path.join(IMAGE_FOLDER, `${movieId}.jpeg`);
-  fs.writeFileSync(imagePath, imageString, { encoding: "base64" });
+  const buffer = Buffer.from(imageString, 'base64');
+  try {
+    const writeStream = createWriteStream(imagePath);
+    writeStream.write(buffer);
+    writeStream.end();
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+  } catch (err) {
+    console.error("Error saving image:", err);
+  }
 }
 
-function loadBackupFile(backupFilePath) {
-  return new Promise((resolve, reject) => {
-    const readStream = createReadStream(backupFilePath, {
-      encoding: "utf8",
-    });
-    let buffer = "";
+async function loadBackupFile(backupFilePath) {
+  const readStream = createReadStream(backupFilePath, {
+    encoding: "utf8",
+  });
+  let remainingData = "";
 
-    readStream.on("data", (chunk) => {
-      buffer += chunk;
-    });
+  readStream.on("data", async (chunk) => {
+    remainingData += chunk;
+    const lines = remainingData.split("\n");
+    remainingData = lines.pop();
 
-    readStream.on("end", () => {
+    for (const line of lines) {
       try {
-        const lines = buffer.trim().split("\n");
-
-        for (const line of lines) {
-          const movie = JSON.parse(line);
-          movies.push(movie);
-          saveImage(movie.id, movie.img);
-        }
-        resolve();
+        const movie = JSON.parse(line);
+        movies.push(movie);
+        await saveImage(movie.id, movie.img);
       } catch (err) {
-        reject(err);
+        console.error("Error parsing movie:", err);
       }
-    });
+    }
+  });
 
-    readStream.on("error", (err) => {
-      reject(err);
-    });
+  readStream.on("end", () => {
+    console.log("Parsed Backup file");
+  });
+
+  readStream.on("error", (err) => {
+    console.error("Error reading backup file:", err);
   });
 }
