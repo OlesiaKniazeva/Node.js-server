@@ -10,16 +10,11 @@ import { StringDecoder } from "node:string_decoder";
 import url from "node:url";
 import path from "node:path";
 import readline from "node:readline";
-import { gzip, gunzip } from "node:zlib";
-import { promisify } from "node:util";
-import { pipeline } from "node:stream";
-
-const pipe = promisify(pipeline);
 
 const port = process.env.PORT || 3000;
 const backupFilePath = process.env.BACKUP_FILE_PATH || "./db_backup.txt";
 const IMAGE_FOLDER = "./images/";
-const BATCH_SIZE = 1000;
+const BATCH_SIZE = 10;
 
 const movies = new Map();
 
@@ -85,10 +80,8 @@ async function processImageRequest(res, imageName) {
   try {
     const stats = await fs.stat(imagePath);
     if (stats.isFile()) {
-      const readStream = createReadStream(imagePath);
-      const unzipStream = gunzip();
       res.writeHead(200, { "Content-Type": "image/jpeg" });
-      readStream.pipe(unzipStream).pipe(res);
+      createReadStream(imagePath).pipe(res);
     } else {
       respondNotFound(res);
     }
@@ -182,9 +175,8 @@ async function saveImage(movieId, imageString) {
   const buffer = Buffer.from(imageString, "base64");
   try {
     const writeStream = createWriteStream(imagePath);
-    const zipStream = gzip();
-    zipStream.pipe(writeStream);
-    zipStream.end(buffer);
+    writeStream.write(buffer);
+    writeStream.end();
     await new Promise((resolve, reject) => {
       writeStream.on("finish", resolve);
       writeStream.on("error", reject);
@@ -225,7 +217,6 @@ async function processBatch(batch) {
         description: movie.description,
         genre: movie.genre,
         release_year: movie.release_year,
-        img: movie.img,
       };
 
       movies.set(movie.id, filmCard);
