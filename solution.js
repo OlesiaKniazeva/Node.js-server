@@ -1,5 +1,10 @@
 import { createServer } from "node:http";
-import {createWriteStream, createReadStream, existsSync, mkdirSync } from "node:fs";
+import {
+  createWriteStream,
+  createReadStream,
+  existsSync,
+  mkdirSync,
+} from "node:fs";
 import fs from "node:fs/promises";
 import { StringDecoder } from "node:string_decoder";
 import url from "node:url";
@@ -71,7 +76,7 @@ function requestHandler(req, res) {
 async function processImageRequest(res, imageName) {
   const imagePath = path.join(IMAGE_FOLDER, imageName);
   try {
-    const stats = await fs.stat(imagePath); 
+    const stats = await fs.stat(imagePath);
     if (stats.isFile()) {
       res.writeHead(200, { "Content-Type": "image/jpeg" });
       createReadStream(imagePath).pipe(res);
@@ -164,14 +169,14 @@ function processEchoResponse(req, res) {
 
 async function saveImage(movieId, imageString) {
   const imagePath = path.join(IMAGE_FOLDER, `${movieId}.jpeg`);
-  const buffer = Buffer.from(imageString, 'base64');
+  const buffer = Buffer.from(imageString, "base64");
   try {
     const writeStream = createWriteStream(imagePath);
     writeStream.write(buffer);
     writeStream.end();
     await new Promise((resolve, reject) => {
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
+      writeStream.on("finish", resolve);
+      writeStream.on("error", reject);
     });
   } catch (err) {
     console.error("Error saving image:", err);
@@ -192,7 +197,16 @@ async function loadBackupFile(backupFilePath) {
     for (const line of lines) {
       try {
         const movie = JSON.parse(line);
-        movies.push(movie);
+        const filmCard = {
+          id: movie.id,
+          title: movie.title,
+          description: movie.description,
+          genre: movie.genre,
+          release_year: movie.release_year,
+          img: movie.img,
+        };
+
+        movies.push(filmCard);
         await saveImage(movie.id, movie.img);
       } catch (err) {
         console.error("Error parsing movie:", err);
