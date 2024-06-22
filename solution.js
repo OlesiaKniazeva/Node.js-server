@@ -9,12 +9,19 @@ import fs from "node:fs/promises";
 import { StringDecoder } from "node:string_decoder";
 import url from "node:url";
 import path from "node:path";
+import readline from "node:readline";
+import { gzip, gunzip } from "node:zlib";
+import { promisify } from "node:util";
+import { pipeline } from "node:stream";
+
+const pipe = promisify(pipeline);
 
 const port = process.env.PORT || 3000;
 const backupFilePath = process.env.BACKUP_FILE_PATH || "./db_backup.txt";
 const IMAGE_FOLDER = "./images/";
+const BATCH_SIZE = 1000;
 
-const movies = [];
+const movies = new Map();
 
 try {
   if (!existsSync(IMAGE_FOLDER)) {
@@ -78,8 +85,10 @@ async function processImageRequest(res, imageName) {
   try {
     const stats = await fs.stat(imagePath);
     if (stats.isFile()) {
+      const readStream = createReadStream(imagePath);
+      const unzipStream = gunzip();
       res.writeHead(200, { "Content-Type": "image/jpeg" });
-      createReadStream(imagePath).pipe(res);
+      readStream.pipe(unzipStream).pipe(res);
     } else {
       respondNotFound(res);
     }
@@ -93,30 +102,31 @@ function processSearchQuery(res, title, page) {
   const resultsPerPage = 10;
   const startIndex = (page - 1) * resultsPerPage;
   const endIndex = startIndex + resultsPerPage;
+  const searchResults = [];
 
-  const searchResults = movies
-    .filter((movie) => movie.title.toLowerCase().includes(title))
-    .slice(startIndex, endIndex)
-    .map((movie) => ({
-      id: movie.id,
-      title: movie.title,
-      description: movie.description,
-      genre: movie.genre,
-      release_year: movie.release_year,
-    }));
+  for (let [id, movie] of movies) {
+    if (movie.title.toLowerCase().includes(title)) {
+      searchResults.push({
+        id: movie.id,
+        title: movie.title,
+        description: movie.description,
+        genre: movie.genre,
+        release_year: movie.release_year,
+      });
+    }
+  }
 
-  const response = { search_result: searchResults };
+  const paginatedResults = searchResults.slice(startIndex, endIndex);
+
+  const response = { search_result: paginatedResults };
 
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify(response));
 }
 
 function processMovieQuery(res, movieId) {
-  console.log(typeof movieId);
+  const movie = movies.get(movieId);
 
-  const movie = movies.find((movie) => movie.id === movieId);
-
-  console.log(movie);
   if (!movie) {
     respondNotFound(res);
     return;
@@ -172,8 +182,9 @@ async function saveImage(movieId, imageString) {
   const buffer = Buffer.from(imageString, "base64");
   try {
     const writeStream = createWriteStream(imagePath);
-    writeStream.write(buffer);
-    writeStream.end();
+    const zipStream = gzip();
+    zipStream.pipe(writeStream);
+    zipStream.end(buffer);
     await new Promise((resolve, reject) => {
       writeStream.on("finish", resolve);
       writeStream.on("error", reject);
@@ -187,38 +198,40 @@ async function loadBackupFile(backupFilePath) {
   const readStream = createReadStream(backupFilePath, {
     encoding: "utf8",
   });
-  let remainingData = "";
+  const rl = readline.createInterface({ input: readStream });
+  let batch = [];
 
-  readStream.on("data", async (chunk) => {
-    remainingData += chunk;
-    const lines = remainingData.split("\n");
-    remainingData = lines.pop();
+  for await (const line of rl) {
+    batch.push(line);
 
-    for (const line of lines) {
-      try {
-        const movie = JSON.parse(line);
-        const filmCard = {
-          id: movie.id,
-          title: movie.title,
-          description: movie.description,
-          genre: movie.genre,
-          release_year: movie.release_year,
-          img: movie.img,
-        };
-
-        movies.push(filmCard);
-        await saveImage(movie.id, movie.img);
-      } catch (err) {
-        console.error("Error parsing movie:", err);
-      }
+    if (batch.length >= BATCH_SIZE) {
+      await processBatch(batch);
+      batch = [];
     }
-  });
+  }
 
-  readStream.on("end", () => {
-    console.log("Parsed Backup file");
-  });
+  if (batch.length > 0) {
+    await processBatch(batch);
+  }
+}
 
-  readStream.on("error", (err) => {
-    console.error("Error reading backup file:", err);
-  });
+async function processBatch(batch) {
+  for (const line of batch) {
+    try {
+      const movie = JSON.parse(line);
+      const filmCard = {
+        id: movie.id,
+        title: movie.title,
+        description: movie.description,
+        genre: movie.genre,
+        release_year: movie.release_year,
+        img: movie.img,
+      };
+
+      movies.set(movie.id, filmCard);
+      await saveImage(movie.id, movie.img);
+    } catch (err) {
+      console.error("Error parsing movie:", err);
+    }
+  }
 }
