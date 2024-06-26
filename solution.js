@@ -97,7 +97,7 @@ function processSearchQuery(res, title, page) {
   const endIndex = startIndex + resultsPerPage;
   const searchResults = [];
 
-  for (let [id, movie] of movies) {
+  for (let [_, movie] of movies) {
     if (movie.title.toLowerCase().includes(title)) {
       searchResults.push({
         id: movie.id,
