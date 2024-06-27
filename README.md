@@ -1,4 +1,4 @@
-Node.js server task, written as part of course from yandex summer school
+Node.js server task, written as part of course from yandex summer school open lectorium
 
 У нас есть свой сервис Фильмопоиск.
 
