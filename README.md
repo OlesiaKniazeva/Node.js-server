@@ -15,30 +15,30 @@ Node.js server task, written as part of course from yandex summer school
 - прочитать файл бэкапа базы данных. Файл лежит по пути BACKUP_FILE_PATH (может быть довольно большой) и не упасть
 - каждая строчка этого файла - это строка с сериализованным JSON с информацией о фильме в формате:
 
-
-    interface IBackupFileRow {
-      id: string;
-      title: string;
-      description: string;
-      genre: string;
-      img: string; // строка с постером фильма в base64
-      release_year: number;
-      screenshots: string[];
-      actors: string[], // id актеров
-      averange_rate: string; // Средняя оценка
-      total_rates_from_user: string; // Сколько всего пользователей оценили этот фильм
-    }
+    
+        interface IBackupFileRow {
+          id: string;
+          title: string;
+          description: string;
+          genre: string;
+          img: string; // строка с постером фильма в base64
+          release_year: number;
+          screenshots: string[];
+          actors: string[], // id актеров
+          averange_rate: string; // Средняя оценка
+          total_rates_from_user: string; // Сколько всего пользователей оценили этот фильм
+        }
 
 - отдавать карточки фильмов в формате JSON при запросе по адресу /api/v1/movie/<movie_id> . Формат ответа:
 
 
-    interface IFilmCard {
-       id: string;
-       title: string;
-       description: string;
-       genre: string;
-       release_year: number;
-    }
+        interface IFilmCard {
+           id: string;
+           title: string;
+           description: string;
+           genre: string;
+           release_year: number;
+        }
 
 - отдавать массив карточек фильмов при поисковом запросе по /api/v1/search с поисковым параметром title (строка по которой ищем название фильма) и page (номер странцы в пангинации).
 
