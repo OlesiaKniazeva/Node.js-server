@@ -1,19 +1,20 @@
 Node.js server task, written as part of course from yandex summer school open lectorium
 
-У нас есть свой сервис Фильмопоиск.
+We have our Film Search service.
 
-К сожалению сервис недавно сломался, кода не осталось и все что у нас есть - это вы, слабый сервер и бэкап базы данных сервиса в формате .txt .
+Unfortunately, the service recently broke down, and there's no code left. All we have is you, a weak server, and a backup of the service's database in a `.txt` format.
 
-Мы ждем что вы напишете сервер на Node.js, который сможет раздавать информацию о фильмах и статические файлы.
+We expect you to write a Node.js server that can distribute information about movies and static files.
 
-Ваша задача:
+Your tasks are:
 
-- при запуске вашего сервера прочитать переменные окружения PORT и BACKUP_FILE_PATH
-- отвечать по эндпоинту /ping
-- пресылать обратно сообщение отправленное на эндпоинт POST /echo
-- отдавать ответ 404 на запросы по несуществующему пути
-- прочитать файл бэкапа базы данных. Файл лежит по пути BACKUP_FILE_PATH (может быть довольно большой) и не упасть
-- каждая строчка этого файла - это строка с сериализованным JSON с информацией о фильме в формате:
+- Upon starting your server, read the environment variables `PORT` and `BACKUP_FILE_PATH`
+- Respond to the endpoint `/ping`
+- Echo back any message sent to the endpoint  `POST /echo`
+- Return a 404 response for requests to non-existent paths
+- Read the backup database file. The file is located at `BACKUP_FILE_PATH` and could be quite large. Ensure the server does not crash while reading it
+  
+Each line of this file is a serialized JSON string containing information about a movie in the format:
 
     
         interface IBackupFileRow {
@@ -29,7 +30,10 @@ Node.js server task, written as part of course from yandex summer school open le
           total_rates_from_user: string; // Сколько всего пользователей оценили этот фильм
         }
 
-- отдавать карточки фильмов в формате JSON при запросе по адресу /api/v1/movie/<movie_id> . Формат ответа:
+- Provide movie cards in JSON format when requested at `/api/v1/movie/<movie_id>`.
+
+
+Response format:
 
 
         interface IFilmCard {
@@ -40,15 +44,17 @@ Node.js server task, written as part of course from yandex summer school open le
            release_year: number;
         }
 
-- отдавать массив карточек фильмов при поисковом запросе по /api/v1/search с поисковым параметром title (строка по которой ищем название фильма) и page (номер странцы в пангинации).
+- Return an array of movie cards for a search query at `/api/v1/search` with search parameters `title` (string to search movie titles) and `page` (pagination page number)
 
-Поиск должен быть не чувствителен к заглавным/строчным буквам, строка может быть не полным названием фильма. Представьте что у нас на фронтенде будет инпут, пользователь будет вводить поисковый запрос, фронтенд с дебаунсом будет посылать запросы на бэкенд и показывать пользователю дропдаун с подсказками.
+The search should be case insensitive and accept partial movie titles. Assume the frontend will have an input field where users enter search queries, with debouncing to send requests to the backend and show dropdown suggestions to the user.
 
-Результаты поиска должны отдаваться с пангинацией по 10 карточек. Страница пангинации передается опционным параметром page (номер страницы в пангинации). Ответ на поисковый запрос должен быть в формате:
+Search results should be paginated with 10 cards per page. Pagination page is passed as an optional parameter `page`.
+
+Response to a search query should be in the format:
 
     interface ISearchResponse {
         search_result: IFilmCard[]
     }
 
-- распарсить и положить картинки постеров фильмов в файловую систему сервиса в папку ./images . Каждая картинка должна иметь имя <movie_id>.jpeg , например 12345.jpeg
-- отдавать картинки по ручке GET /static/images/<movie_id>.jpeg
+- Parse and store movie poster images into the service's file system in the `./images` folder. Each image should be named `<movie_id>.jpeg`, for example, `12345.jpeg`
+- Serve images via `GET /static/images/<movie_id>.jpeg`.
